@@ -19,7 +19,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Load environment variables
 load_dotenv(BASE_DIR.joinpath(".env"), override=True)
 
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.1/howto/deployment/checklist/
 
@@ -30,8 +29,6 @@ SECRET_KEY = os.environ['DJANGO_SECRET_KEY']
 DEBUG = (os.getenv('DJANGO_DEBUG', 'False') == 'True')
 
 ALLOWED_HOSTS = []
-
-
 
 # Application definition
 
@@ -75,7 +72,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'menutec_bot.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/3.1/ref/settings/#databases
 
@@ -85,7 +81,6 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/3.1/ref/settings/#auth-password-validators
@@ -105,7 +100,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/3.1/topics/i18n/
 
@@ -119,7 +113,6 @@ USE_L10N = True
 
 USE_TZ = True
 
-
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
 
@@ -128,3 +121,8 @@ STATIC_URL = '/static/'
 # Static path
 if not DEBUG:
     STATIC_ROOT = BASE_DIR.joinpath("static")
+
+# Bot controller settings
+BOT = {
+    'TOKEN': os.environ["BOT_TOKEN"]
+}

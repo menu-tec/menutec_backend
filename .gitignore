@@ -1,8 +1,22 @@
-# Created by https://www.toptal.com/developers/gitignore/api/git,linux,python,django,pycharm+all
-# Edit at https://www.toptal.com/developers/gitignore?templates=git,linux,python,django,pycharm+all
+# Created by https://www.toptal.com/developers/gitignore/api/git,linux,python,django,pycharm+all,archlinuxpackages,virtualenv,venv,dotenv
+# Edit at https://www.toptal.com/developers/gitignore?templates=git,linux,python,django,pycharm+all,archlinuxpackages,virtualenv,venv,dotenv
+
+### ArchLinuxPackages ###
+*.tar
+*.tar.*
+*.jar
+*.exe
+*.msi
+*.zip
+*.tgz
+*.log
+*.log.*
+*.sig
+
+pkg/
+src/
 
 ### Django ###
-*.log
 *.pot
 *.pyc
 __pycache__/
@@ -155,6 +169,9 @@ Thumbs.db #thumbnail cache on Windows
 # profiling data
 .prof
 
+
+### dotenv ###
+.env
 
 ### Git ###
 # Created by git for backups. To disable backups in Git:
@@ -342,4 +359,22 @@ modules.xml
 # profiling data
 
 
-# End of https://www.toptal.com/developers/gitignore/api/git,linux,python,django,pycharm+all
+### venv ###
+# Virtualenv
+# http://iamzed.com/2009/05/07/a-primer-on-virtualenv/
+[Bb]in
+[Ii]nclude
+[Ll]ib
+[Ll]ib64
+[Ll]ocal
+[Ss]cripts
+pyvenv.cfg
+.venv
+pip-selfcheck.json
+
+### VirtualEnv ###
+# Virtualenv
+# http://iamzed.com/2009/05/07/a-primer-on-virtualenv/
+
+# End of https://www.toptal.com/developers/gitignore/api/git,linux,python,django,pycharm+all,archlinuxpackages,virtualenv,venv,dotenv
+

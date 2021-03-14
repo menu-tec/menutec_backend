@@ -347,7 +347,7 @@ class BotController:
             },
             fallbacks=[
                 CommandHandler("cancel", self._cancel),
-                MessageHandler(Filters.all, self._unknown_command)
+                MessageHandler(Filters.text & ~Filters.command, self._unknown_command)
             ],
         ))
 
@@ -369,9 +369,9 @@ class BotController:
             },
             fallbacks=[
                 CommandHandler("cancel", self._cancel),
-                MessageHandler(Filters.all, self._unknown_command)
+                MessageHandler(Filters.text & ~Filters.command, self._unknown_command)
             ],
         ))
 
         # Fallback handler
-        self.dispatcher.add_handler(MessageHandler(Filters.all, self._unknown_command))
+        self.dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, self._unknown_command))

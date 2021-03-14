@@ -155,7 +155,8 @@ class BotController:
 
         elif update.callback_query.data == MENU_END_ADDING_MEAL:
 
-            CREATED_MENUS[context.user_data[MENU_DATE_CHOICE]] = {}
+            if not CREATED_MENUS.get(context.user_data[MENU_DATE_CHOICE]):
+                CREATED_MENUS[context.user_data[MENU_DATE_CHOICE]] = {}
 
             CREATED_MENUS[context.user_data[MENU_DATE_CHOICE]][context.user_data[MENU_TYPE_CHOICE]] = context.user_data[MENU_MEALS]
 
@@ -187,10 +188,20 @@ class BotController:
 
             context.user_data[MENU_DATE_CHOICE] = date_result.strftime("%d/%m/%Y")
 
-            buttons = [[InlineKeyboardButton(value, callback_data=key)] for key, value in MENU_TYPES.items()]
+            if len(CREATED_MENUS) > 0 and CREATED_MENUS.get(context.user_data[MENU_DATE_CHOICE]):
+                buttons = [[InlineKeyboardButton(value, callback_data=key)]
+                           for key, value in MENU_TYPES.items()
+                           if key not in CREATED_MENUS.get(context.user_data[MENU_DATE_CHOICE]).keys()]
+            else:
+                buttons = [[InlineKeyboardButton(value, callback_data=key)]
+                           for key, value in MENU_TYPES.items()]
 
-            # if not CREATED_MENUS.get(context.user_data[MENU_DATE_CHOICE]):
-            #     CREATED_MENUS[context.user_data[MENU_DATE_CHOICE]] = {}
+            if len(buttons) == 0:
+                update.callback_query.edit_message_text(
+                    text=f"Para esta fecha ya no se puede crear más menús, "
+                         f"por favor edite uno existente o elimínelo para crear uno nuevo.",
+                )
+                return ConversationHandler.END
 
             update.callback_query.edit_message_text(
                 text=f"En qué momento se servirá el menú del día {date_result.strftime('%d/%m/%Y')}?",

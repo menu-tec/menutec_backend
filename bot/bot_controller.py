@@ -20,13 +20,6 @@ MENU_TYPES = {
     "CENA": "Cena (17:00 - 19:30)",
 }
 
-MENU_TYPES_CODES = [
-    "DESAYUNO",
-    "ALMUERZO",
-    "CAFE",
-    "CENA"
-]
-
 (
     SELECTING_MENU_DATE,
     SELECTING_MENU_TYPE,
@@ -51,9 +44,9 @@ CREATED_MENUS = {}
 
 class BotController:
 
-    def __init__(self) -> None:
+    def __init__(self):
         self.updater = Updater(conf.BOT['TOKEN'])
-        self.dispatcher = self.updater.dispatcher
+        self.dispatcher = Dispatcher(Bot(conf.BOT['TOKEN']), None, workers=0)
         # self.update_queue = Queue()
         # self.dispatcher = Dispatcher(Bot(token), self.update_queue)
 
@@ -64,6 +57,13 @@ class BotController:
     #     thread.start()
     #
     #     return self.update_queue
+
+    def run(self) -> None:
+        self._init_handlers()
+
+        self.updater.start_polling()
+
+        self.updater.idle()
 
     def _unknown_command(self, update: Update, _: CallbackContext) -> None:
         update.message.reply_text(
@@ -100,8 +100,10 @@ class BotController:
         )
 
     def _make_menu(self, update: Update, _: CallbackContext) -> int:
+
         update.message.reply_text(
-            "Seleccione la fecha del nuevo menú",
+            "Seleccione la fecha del nuevo menú"
+            "\nPuede escribir /cancel en cualquier momento para cancelar la creación del menú",
             reply_markup=telegramcalendar.create_calendar()
         )
 
@@ -140,7 +142,7 @@ class BotController:
             "\n\n¿Desea agregar otra entrada?",
             reply_markup=InlineKeyboardMarkup(
                 [[InlineKeyboardButton(text="Añadir nueva entrada", callback_data=MENU_NEW_MEAL)],
-                 [InlineKeyboardButton(text="Guardar menú", callback_data=MENU_END_ADDING_MEAL)]])
+                 [InlineKeyboardButton(text="Crear menú", callback_data=MENU_END_ADDING_MEAL)]])
         )
 
         return ADDING_MENU_ELEMENTS
@@ -250,9 +252,8 @@ class BotController:
         kb = [[InlineKeyboardButton(d, callback_data=f"DATE_DELETE,{d}")] for d in CREATED_MENUS.keys()]
 
         update.message.reply_text(
-            """
-            Escoja la fecha del menú a eliminar:
-            """,
+            "Escoja la fecha del menú a eliminar:"
+            "\nPuede escribir /cancel en cualquier momento para cancelar la eliminación del menú",
             reply_markup=InlineKeyboardMarkup(kb)
         )
 
@@ -297,16 +298,6 @@ class BotController:
         )
 
         return ConversationHandler.END
-
-
-
-
-    def run(self) -> None:
-        self._init_handlers()
-
-        self.updater.start_polling()
-
-        self.updater.idle()
 
     def _init_handlers(self):
         self.dispatcher.add_handler(CommandHandler("start", self._start))

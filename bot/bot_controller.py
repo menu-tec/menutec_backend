@@ -47,6 +47,7 @@ class BotController:
     def __init__(self):
         self.updater = Updater(conf.BOT['TOKEN'])
         self.dispatcher = Dispatcher(Bot(conf.BOT['TOKEN']), None, workers=0)
+        self._init_handlers()
         # self.update_queue = Queue()
         # self.dispatcher = Dispatcher(Bot(token), self.update_queue)
 

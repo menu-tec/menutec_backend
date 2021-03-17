@@ -125,6 +125,8 @@ if not DEBUG:
 # Bot controller settings
 BOT = {
     'TOKEN': os.environ["BOT_TOKEN"],
-    'WEBHOOK_SECRET': os.environ["BOT_WEBHOOK_SECRET"]
+    'WEBHOOK_SECRET': os.environ["BOT_WEBHOOK_SECRET"],
+    'ADMIN_GROUP': os.environ["BOT_ADMIN_GROUP"],
+    'ADMIN_TITLE': "administrator"
 
 }

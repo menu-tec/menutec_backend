@@ -641,7 +641,7 @@ class BotController:
 
     def _init_handlers(self):
 
-        self.dispatcher.add_handler(MessageHandler(~self.SecurityFilter(), lambda update, _: update.message.reply_text("FUCK YOU")))
+        # self.dispatcher.add_handler(MessageHandler(~self.SecurityFilter(), lambda update, _: update.message.reply_text("FUCK YOU")))
 
         self.dispatcher.add_handler(CommandHandler("start", self._menus))
 

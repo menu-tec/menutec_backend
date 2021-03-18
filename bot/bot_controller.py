@@ -1,4 +1,5 @@
 import datetime
+import pathlib
 from queue import Queue
 from threading import Thread
 
@@ -12,6 +13,8 @@ MENUS = "Menús"
 MAKE_MENU = "Crear menú"
 LIST_MENUS = "Ver próximos menús"
 DELETE_MENU = "Eliminar menú"
+LIST_DEFAULTS = "Ver plantillas de menú"
+MAKE_DEFAULTS = "Crear plantilla de menú"
 
 MENU_TYPES = {
     "DESAYUNO": "Desayuno (08:00 - 10:00)",
@@ -20,14 +23,30 @@ MENU_TYPES = {
     "CENA": "Cena (17:00 - 19:30)",
 }
 
+DEFAULT_OPTIONS = {
+    'DESAYUNO': {
+        'Gallo pinto': '200',
+        'Plátano maduro': '300',
+        'Cereal sin leche': '300',
+        'Cereal con leche': '500',
+    },
+    'ALMUERZO': {
+        'Arroz': '200',
+        'Frijoles': '100',
+        'Ensalada': '200',
+        'Fresco': '200',
+    },
+}
+
 (
     SELECTING_MENU_DATE,
     SELECTING_MENU_TYPE,
     ADDING_MENU_ELEMENTS,
     SELECTING_MEAL_NAME,
     SELECTING_MEAL_PRICE,
+    ADDING_PREDEFINED_OPTIONS
 
-) = range(5)
+) = range(20, 26)
 
 MENU_TYPE_CHOICE = 6
 MENU_DATE_CHOICE = 7
@@ -75,11 +94,11 @@ CREATED_MENUS = {
             'Rollo de jamón': '300'
         },
         'CENA': {
-                'Arroz': '200',
-                'Frijoles': '100',
-                'Ensalada': '200',
-                'Fresco': '200',
-                'Fajitas de res': '800'
+            'Arroz': '200',
+            'Frijoles': '100',
+            'Ensalada': '200',
+            'Fresco': '200',
+            'Fajitas de res': '800'
         },
     }
 }
@@ -132,7 +151,8 @@ class BotController:
     def _menus(self, update: Update, _: CallbackContext) -> None:
 
         options = [
-            [LIST_MENUS, MAKE_MENU]
+            [LIST_MENUS, MAKE_MENU],
+            [LIST_DEFAULTS, MAKE_DEFAULTS],
         ]
 
         kb = ReplyKeyboardMarkup(options, one_time_keyboard=True, resize_keyboard=True)
@@ -156,11 +176,18 @@ class BotController:
 
         context.user_data[MENU_MEALS] = {}
 
+        kb = [
+            [InlineKeyboardButton(text="Añadir nueva opción", callback_data=MENU_NEW_MEAL)],
+        ]
+
+        if DEFAULT_OPTIONS.get(update.callback_query.data):
+            kb.append([InlineKeyboardButton(text="Añadir opciones predefinidas",
+                                  callback_data=f"ADD_OPTS_DEFAULTS,{context.user_data[MENU_DATE_CHOICE]},{update.callback_query.data}")])
+
         update.callback_query.edit_message_text(
             text=f"El menú de <i>{MENU_TYPES.get(update.callback_query.data)}</i> "
                  f"para el día <b>{context.user_data[MENU_DATE_CHOICE]}</b> no tiene opciones.",
-            reply_markup=InlineKeyboardMarkup(
-                [[InlineKeyboardButton(text="Añadir nueva opción", callback_data=MENU_NEW_MEAL)]]),
+            reply_markup=InlineKeyboardMarkup(kb),
             parse_mode=ParseMode.HTML
         )
 
@@ -196,6 +223,8 @@ class BotController:
                 "El precio es demasiado largo. Intente otra vez."
             )
 
+        update.effective_chat.send_document()
+
         context.user_data[MENU_MEALS][context.user_data[MENU_TEMP_MEAL]] = update.message.text
 
         update.message.reply_text(
@@ -205,6 +234,33 @@ class BotController:
             reply_markup=InlineKeyboardMarkup(
                 [[InlineKeyboardButton(text="Añadir nueva opción", callback_data=MENU_NEW_MEAL)],
                  [InlineKeyboardButton(text="Guardar menú", callback_data=MENU_END_ADDING_MEAL)]]),
+            parse_mode=ParseMode.HTML
+        )
+
+        return ADDING_MENU_ELEMENTS
+
+    def _add_meal_price_defaults(self, update: Update, context: CallbackContext):
+
+        if not all(c.isnumeric() for c in update.message.text + update.message.text.strip()):
+            update.message.reply_text(
+                "Solo se permiten números."
+            )
+            return
+
+        if len(update.message.text) > 6:
+            update.message.reply_text(
+                "El precio es demasiado largo. Intente otra vez."
+            )
+
+        context.user_data[MENU_MEALS][context.user_data[MENU_TEMP_MEAL]] = update.message.text
+
+        update.message.reply_text(
+            f"La plantilla del menú de <i>{MENU_TYPES.get(context.user_data.get('DEFAULT_TIPO'))}</i> " +
+            f"tiene las siguientes opciones:\n\n" +
+            "{}".format("\n".join([f"₡{p}, {n}." for n, p in context.user_data[MENU_MEALS].items()])),
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton(text="Añadir nueva opción", callback_data=MENU_NEW_MEAL)],
+                 [InlineKeyboardButton(text="Guardar plantilla", callback_data=MENU_END_ADDING_MEAL)]]),
             parse_mode=ParseMode.HTML
         )
 
@@ -229,7 +285,46 @@ class BotController:
             print(CREATED_MENUS)
 
             update.callback_query.edit_message_text(
-                text="Menú guardado"
+                text="Menú guardado."
+            )
+            return ConversationHandler.END
+
+    def _process_adding_meal_defaults(self, update: Update, context: CallbackContext):
+        fecha, tipo = update.callback_query.data.split(",")[1:]
+        context.user_data[MENU_MEALS] = DEFAULT_OPTIONS.get(tipo)
+
+        update.callback_query.edit_message_text(
+            f"El menú de <i>{MENU_TYPES.get(context.user_data.get(MENU_TYPE_CHOICE))}</i> " +
+            f"para el día <b>{context.user_data[MENU_DATE_CHOICE]}</b> tiene las siguientes opciones:\n\n" +
+            "{}".format("\n".join([f"₡{p}, {n}." for n, p in context.user_data[MENU_MEALS].items()])),
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton(text="Añadir nueva opción", callback_data=MENU_NEW_MEAL)],
+                 [InlineKeyboardButton(text="Guardar menú", callback_data=MENU_END_ADDING_MEAL)]]),
+            parse_mode=ParseMode.HTML
+        )
+
+        return ADDING_MENU_ELEMENTS
+
+
+
+
+    def _process_adding_meal_default(self, update: Update, context: CallbackContext):
+        if update.callback_query.data == MENU_NEW_MEAL:
+
+            update.callback_query.edit_message_text(
+                text="Escriba el nombre de la nueva opción."
+            )
+            return SELECTING_MEAL_NAME
+
+        elif update.callback_query.data == MENU_END_ADDING_MEAL:
+
+            if not DEFAULT_OPTIONS.get(context.user_data["DEFAULT_TIPO"]):
+                DEFAULT_OPTIONS[context.user_data["DEFAULT_TIPO"]] = {}
+
+            DEFAULT_OPTIONS[context.user_data["DEFAULT_TIPO"]] = context.user_data[MENU_MEALS]
+
+            update.callback_query.edit_message_text(
+                text="Plantilla de menú guardada."
             )
             return ConversationHandler.END
 
@@ -297,14 +392,15 @@ class BotController:
                     entradas="\n\n"
                         .join([
                         "<i>{tipo}:</i>\n{meals}".format(tipo=MENU_TYPES.get(tipo),
-                                                  meals="\n".join([f"₡{p}, {n}." for n, p in meals.items()]))
+                                                         meals="\n".join([f"₡{p}, {n}." for n, p in meals.items()]))
                         for tipo, meals in menu.items()
                     ])
                 ),
                 reply_markup=InlineKeyboardMarkup(
                     [
                         [InlineKeyboardButton("Eliminar un menú", callback_data=f"DELETE_MENU,{fecha}")],
-                        [InlineKeyboardButton("Editar un menú", callback_data=f"EDIT_MENU,{fecha}")]
+                        [InlineKeyboardButton("Editar un menú", callback_data=f"EDIT_MENU,{fecha}")],
+                        [InlineKeyboardButton("Descargar menús", callback_data=f"DOWNLOAD,{fecha}")]
                     ]
                 ),
                 parse_mode=ParseMode.HTML
@@ -336,12 +432,26 @@ class BotController:
                 entradas="\n\n"
                     .join([
                     "<i>{tipo}</i>:\n{meals}".format(tipo=MENU_TYPES.get(tipo),
-                                              meals="\n".join([f"₡{p}, {n}." for n, p in meals.items()]))
+                                                     meals="\n".join([f"₡{p}, {n}." for n, p in meals.items()]))
                     for tipo, meals in CREATED_MENUS.get(key).items()
                 ])
             ),
             reply_markup=InlineKeyboardMarkup(kb),
             parse_mode=ParseMode.HTML
+        )
+
+    def _process_deleteing_menu_defaults(self, update: Update, _: CallbackContext):
+        key = update.callback_query.data.split(",")[1]
+
+        if not DEFAULT_OPTIONS.get(key):
+            update.callback_query.answer(f"Nada que eliminar.")
+            update.callback_query.delete_message()
+            return
+
+        DEFAULT_OPTIONS.pop(key)
+
+        update.callback_query.edit_message_text(
+            text="Plantilla eliminada."
         )
 
     def _process_deleteing_menu_type(self, update: Update, _: CallbackContext):
@@ -366,7 +476,7 @@ class BotController:
                 entradas="\n\n"
                     .join([
                     "<i>{tipo}:</i>\n{meals}".format(tipo=MENU_TYPES.get(tipo),
-                                              meals="\n".join([f"₡{p}, {n}." for n, p in meals.items()]))
+                                                     meals="\n".join([f"₡{p}, {n}." for n, p in meals.items()]))
                     for tipo, meals in CREATED_MENUS.get(fecha).items()
                 ])
             ),
@@ -426,11 +536,25 @@ class BotController:
         fecha, tipo = update.callback_query.data.split(",")[1:]
 
         kb = [
-            [InlineKeyboardButton(f"₡{price}, {meal}.", callback_data=f"DELETE_OPT_MEAL,{fecha},{tipo},{meal}")]
-            for meal, price in CREATED_MENUS.get(fecha).get(tipo).items()
-        ] + [
-            [InlineKeyboardButton(f"₡{price}, {meal}", callback_data=f"DELETE_OPT_MEAL,{fecha},{tipo},{meal}")]
-            for meal, price in context.user_data["ADDED"].items()
+                 [InlineKeyboardButton(f"₡{price}, {meal}.", callback_data=f"DELETE_OPT_MEAL,{fecha},{tipo},{meal}")]
+                 for meal, price in CREATED_MENUS.get(fecha).get(tipo).items() if
+                 meal not in context.user_data["DELETED"]
+             ] + [
+                 [InlineKeyboardButton(f"₡{price}, {meal}", callback_data=f"DELETE_OPT_MEAL,{fecha},{tipo},{meal}")]
+                 for meal, price in context.user_data["ADDED"].items()
+             ]
+
+        update.callback_query.edit_message_text(
+            text="""Seleccione la opción a eliminar.""",
+            reply_markup=InlineKeyboardMarkup(kb)
+        )
+
+    def _delete_opt_defaults(self, update: Update, context: CallbackContext):
+        tipo = update.callback_query.data.split(",")[1]
+
+        kb = [
+            [InlineKeyboardButton(f"₡{price}, {meal}.", callback_data=f"DELETE_OPT_DEFAULTS,{tipo},{meal}")]
+            for meal, price in DEFAULT_OPTIONS.get(tipo).items()
         ]
 
         update.callback_query.edit_message_text(
@@ -477,6 +601,39 @@ class BotController:
             parse_mode=ParseMode.HTML
         )
 
+    def _delete_opt_meal_defaults(self, update: Update, context: CallbackContext):
+        tipo, meal = update.callback_query.data.split(",")[1:]
+
+        if not DEFAULT_OPTIONS.get(tipo):
+            update.callback_query.edit_message_text(
+                "Error, la plantilla que intenta modificar ya no existe."
+            )
+        if DEFAULT_OPTIONS.get(tipo).get(meal):
+            DEFAULT_OPTIONS.get(tipo).pop(meal)
+
+        update.callback_query.edit_message_text(
+            """
+            La plantilla del menú de <b><i>{tipo}</i></b> tiene las siguientes opciones:\n\n{entradas}
+            """
+                .format(
+                tipo=MENU_TYPES.get(tipo),
+                entradas="\n".join(
+                    [
+                        f"₡{price}, {meal}"
+                        for meal, price in DEFAULT_OPTIONS.get(tipo).items()
+                    ]
+                )
+            ),
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [InlineKeyboardButton("Eliminar esta plantilla", callback_data=f"DELETE_MENU_DEFAULTS,{tipo}")],
+                    [InlineKeyboardButton("Eliminar una opción", callback_data=f"DELETE_MENU_DEFAULTS_OPT,{tipo}")],
+                    [InlineKeyboardButton("Agregar una opción", callback_data=f"ADD_OPT_DEFAULTS,{tipo}")]
+                ]
+            ),
+            parse_mode=ParseMode.HTML
+        )
+
     def _edit_cancel(self, update: Update, context: CallbackContext):
         fecha, tipo = update.callback_query.data.split(",")[1:]
 
@@ -499,7 +656,7 @@ class BotController:
                 entradas="\n\n"
                     .join([
                     "<i>{tipo}:</i>\n{meals}".format(tipo=MENU_TYPES.get(tipo),
-                                              meals="\n".join([f"₡{p}, {n}." for n, p in meals.items()]))
+                                                     meals="\n".join([f"₡{p}, {n}." for n, p in meals.items()]))
                     for tipo, meals in CREATED_MENUS.get(fecha).items()
                 ])
             ),
@@ -515,6 +672,17 @@ class BotController:
         fecha, tipo = update.callback_query.data.split(",")[1:]
 
         context.user_data["ADD_OPT_FECHA"] = fecha
+        context.user_data["ADD_OPT_TIPO"] = tipo
+
+        update.callback_query.delete_message()
+
+        update.effective_chat.send_message(text="""Escriba el nombre de la nueva opción.""")
+
+        return 40
+
+    def _add_opt_defaults(self, update: Update, context: CallbackContext):
+        tipo = update.callback_query.data.split(",")[1]
+
         context.user_data["ADD_OPT_TIPO"] = tipo
 
         update.callback_query.delete_message()
@@ -543,7 +711,7 @@ class BotController:
 
         if len(update.message.text) > 6:
             update.message.reply_text(
-                "El percio es demasiado largo. Intente otra vez."
+                "El precio es demasiado largo. Intente otra vez."
             )
 
         fecha = context.user_data["ADD_OPT_FECHA"]
@@ -590,6 +758,53 @@ class BotController:
 
         return ConversationHandler.END
 
+    def _add_opt_price_defaults(self, update: Update, context: CallbackContext):
+
+        if len(update.message.text) > 6:
+            update.message.reply_text(
+                "El precio es demasiado largo. Intente otra vez."
+            )
+            return
+
+        if not all(c.isnumeric() for c in update.message.text + update.message.text.strip()):
+            update.message.reply_text(
+                "Por favor ingrese solo números."
+            )
+            return
+
+        tipo = context.user_data["ADD_OPT_TIPO"]
+
+        if not DEFAULT_OPTIONS.get(tipo):
+            update.message.reply_text("Error, la plantilla que intenta modificar ya no existe.")
+            return ConversationHandler.END
+
+        DEFAULT_OPTIONS.get(tipo)[context.user_data["OPT_TEMP"]] = update.message.text
+
+        update.message.reply_text(
+            """
+            La plantilla del menú de <b><i>{tipo}</i></b> tiene las siguientes opciones:\n\n{entradas}
+            """
+                .format(
+                tipo=MENU_TYPES.get(tipo),
+                entradas="\n".join(
+                    [
+                        f"₡{price}, {meal}"
+                        for meal, price in DEFAULT_OPTIONS.get(tipo).items()
+                    ]
+                )
+            ),
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [InlineKeyboardButton("Eliminar esta plantilla", callback_data=f"DELETE_MENU_DEFAULTS,{tipo}")],
+                    [InlineKeyboardButton("Eliminar una opción", callback_data=f"DELETE_MENU_DEFAULTS_OPT,{tipo}")],
+                    [InlineKeyboardButton("Agregar una opción", callback_data=f"ADD_OPT_DEFAULTS,{tipo}")]
+                ]
+            ),
+            parse_mode=ParseMode.HTML
+        )
+
+        return ConversationHandler.END
+
     def _cancel_add_opt(self, update: Update, context: CallbackContext):
 
         update.message.reply_text("Operación cancelada.")
@@ -630,10 +845,86 @@ class BotController:
 
         return ConversationHandler.END
 
+    def _make_menu_defaults(self, update: Update, _: CallbackContext) -> int:
+
+        kb = [
+            [InlineKeyboardButton(MENU_TYPES.get(d), callback_data=f"MAKE_MENU_DEFAULTS,{d}")]
+            for d in MENU_TYPES.keys() if d not in DEFAULT_OPTIONS.keys()
+        ]
+
+        update.message.reply_text(
+            "Seleccione el tipo de menú.",
+            reply_markup=InlineKeyboardMarkup(kb)
+        )
+
+        return SELECTING_MENU_TYPE
+
+    def _process_menu_type_defaults(self, update: Update, context: CallbackContext) -> int:
+
+        tipo = update.callback_query.data.split(",")[1]
+
+        context.user_data["DEFAULT_TIPO"] = tipo
+
+        context.user_data[MENU_MEALS] = {}
+
+        update.callback_query.edit_message_text(
+            text=f"La plantilla del menú de <i>{MENU_TYPES.get(tipo)}</i> "
+                 f"no tiene opciones.",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton(text="Añadir nueva opción", callback_data=MENU_NEW_MEAL)]]),
+            parse_mode=ParseMode.HTML
+        )
+
+        return ADDING_MENU_ELEMENTS
+
+    def _list_menus_defaults(self, update: Update, _: CallbackContext):
+
+        if len(DEFAULT_OPTIONS) == 0:
+            update.message.reply_text(
+                """
+                No hay plantillas disponibles.
+                """
+            )
+            return
+
+        for tipo, menu in DEFAULT_OPTIONS.items():
+            update.message.reply_text(
+                """
+                La plantilla del menú de <b><i>{tipo}</i></b> tiene las siguientes opciones:\n\n{entradas}
+                """
+                    .format(
+                    tipo=MENU_TYPES.get(tipo),
+                    entradas="\n".join(
+                        [
+                            f"₡{price}, {meal}"
+                            for meal, price in menu.items()
+                        ]
+                    )
+                ),
+                reply_markup=InlineKeyboardMarkup(
+                    [
+                        [InlineKeyboardButton("Eliminar esta plantilla", callback_data=f"DELETE_MENU_DEFAULTS,{tipo}")],
+                        [InlineKeyboardButton("Eliminar una opción", callback_data=f"DELETE_MENU_DEFAULTS_OPT,{tipo}")],
+                        [InlineKeyboardButton("Agregar una opción", callback_data=f"ADD_OPT_DEFAULTS,{tipo}")]
+                    ]
+                ),
+                parse_mode=ParseMode.HTML
+            )
+
+    def _download(self, update: Update, context: CallbackContext):
+        fecha = update.callback_query.data.split(",")[1]
+
+        update.
+
+        update.effective_chat.send_document(
+            open("slides.pdf", "rb"),
+            f"Menu_{fecha.replace('/', '-')}"
+        )
+
+
 
     class SecurityFilter(UpdateFilter):
         def filter(self, update: Update):
-
             user = update.message.bot.get_chat_member(conf.BOT["ADMIN_GROUP"],
                                                       update.message.from_user.id)
 
@@ -647,7 +938,14 @@ class BotController:
 
         self.dispatcher.add_handler(MessageHandler(Filters.regex(f"^{LIST_MENUS}$"), self._list_menus))
 
-        self.dispatcher.add_handler(CallbackQueryHandler(self._process_deleteing_menu, pattern=f"^(DELETE_MENU.*)$"))
+        self.dispatcher.add_handler(MessageHandler(Filters.regex(f"^{LIST_DEFAULTS}$"), self._list_menus_defaults))
+
+        self.dispatcher.add_handler(CallbackQueryHandler(self._process_deleteing_menu, pattern=f"^(DELETE_MENU,.*)$"))
+
+        self.dispatcher.add_handler(CallbackQueryHandler(self._download, pattern=f"^(DOWNLOAD,.*)$"))
+
+        self.dispatcher.add_handler(
+            CallbackQueryHandler(self._process_deleteing_menu_defaults, pattern=f"^(DELETE_MENU_DEFAULTS,.*)$"))
 
         self.dispatcher.add_handler(
             CallbackQueryHandler(self._process_deleteing_menu_type, pattern=f"^(MENU_TYPE_DELETE.*)$"))
@@ -659,6 +957,12 @@ class BotController:
         self.dispatcher.add_handler(CallbackQueryHandler(self._edit_cancel, pattern=f"^(EDIT_CANCEL,.*)$"))
 
         self.dispatcher.add_handler(CallbackQueryHandler(self._delete_opt, pattern=f"^(DELETE_OPT,.*)$"))
+
+        self.dispatcher.add_handler(
+            CallbackQueryHandler(self._delete_opt_defaults, pattern=f"^(DELETE_MENU_DEFAULTS_OPT,.*)$"))
+
+        self.dispatcher.add_handler(
+            CallbackQueryHandler(self._delete_opt_meal_defaults, pattern=f"^(DELETE_OPT_DEFAULTS,.*)$"))
 
         self.dispatcher.add_handler(CallbackQueryHandler(self._delete_opt_meal, pattern=f"^(DELETE_OPT_MEAL,.*)$"))
 
@@ -674,6 +978,48 @@ class BotController:
             },
             fallbacks=[
                 CommandHandler("cancel", self._cancel_add_opt),
+                MessageHandler(Filters.text & ~Filters.command, self._unknown_command)
+            ],
+        ))
+
+        self.dispatcher.add_handler(ConversationHandler(
+            entry_points=[CallbackQueryHandler(self._add_opt_defaults, pattern=f"^(ADD_OPT_DEFAULTS,.*)$")],
+            states={
+                40: [
+                    MessageHandler(Filters.text & ~Filters.command, self._add_opt_meal),
+                ],
+                50: [
+                    MessageHandler(Filters.text & ~Filters.command, self._add_opt_price_defaults),
+                ]
+            },
+            fallbacks=[
+                CommandHandler("cancel", self._cancel_add_opt),
+                MessageHandler(Filters.text & ~Filters.command, self._unknown_command)
+            ],
+        ))
+
+        self.dispatcher.add_handler(ConversationHandler(
+            entry_points=[MessageHandler(Filters.regex(f"^{MAKE_DEFAULTS}$"), self._make_menu_defaults)],
+            states={
+                SELECTING_MENU_TYPE: [
+                    CallbackQueryHandler(self._process_menu_type_defaults,
+                                         pattern=f"^"
+                                                 f"(MAKE_MENU_DEFAULTS,.*)"
+                                                 f"$")
+                ],
+                ADDING_MENU_ELEMENTS: [
+                    CallbackQueryHandler(self._process_adding_meal_default,
+                                         pattern=f"^({MENU_NEW_MEAL})|({MENU_END_ADDING_MEAL})$")
+                ],
+                SELECTING_MEAL_NAME: [
+                    MessageHandler(Filters.text & ~Filters.command, self._add_meal),
+                ],
+                SELECTING_MEAL_PRICE: [
+                    MessageHandler(Filters.text & ~Filters.command, self._add_meal_price_defaults),
+                ]
+            },
+            fallbacks=[
+                CommandHandler("cancel", self._cancel),
                 MessageHandler(Filters.text & ~Filters.command, self._unknown_command)
             ],
         ))
@@ -699,6 +1045,8 @@ class BotController:
                                                  f"$")
                 ],
                 ADDING_MENU_ELEMENTS: [
+                    CallbackQueryHandler(self._process_adding_meal_defaults,
+                                         pattern=f"^(ADD_OPTS_DEFAULTS.*)$"),
                     CallbackQueryHandler(self._process_adding_meal,
                                          pattern=f"^({MENU_NEW_MEAL})|({MENU_END_ADDING_MEAL})$")
                 ],

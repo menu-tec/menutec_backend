@@ -914,8 +914,6 @@ class BotController:
     def _download(self, update: Update, context: CallbackContext):
         fecha = update.callback_query.data.split(",")[1]
 
-        update.
-
         update.effective_chat.send_document(
             open("slides.pdf", "rb"),
             f"Menu_{fecha.replace('/', '-')}"

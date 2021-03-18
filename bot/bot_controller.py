@@ -23,6 +23,8 @@ MENU_TYPES = {
     "CENA": "Cena (17:00 - 19:30)",
 }
 
+MENUS_PUBLIC = {}
+
 DEFAULT_OPTIONS = {
     'DESAYUNO': {
         'Gallo pinto': '200',
@@ -90,9 +92,9 @@ CREATED_MENUS = {
             'Risotto de hongos': '200',
             'Coliflor y brócoli': '300'
         },
-        'CAFE': {
-            'Rollo de jamón': '300'
-        },
+        # 'CAFE': {
+        #     'Rollo de jamón': '300'
+        # },
         'CENA': {
             'Arroz': '200',
             'Frijoles': '100',
@@ -223,8 +225,6 @@ class BotController:
                 "El precio es demasiado largo. Intente otra vez."
             )
 
-        update.effective_chat.send_document()
-
         context.user_data[MENU_MEALS][context.user_data[MENU_TEMP_MEAL]] = update.message.text
 
         update.message.reply_text(
@@ -283,6 +283,19 @@ class BotController:
                 MENU_MEALS]
 
             print(CREATED_MENUS)
+
+            if MENUS_PUBLIC.get(context.user_data[MENU_DATE_CHOICE]):
+                context.bot.edit_message_text(
+                    text="El menú para el <b>{fecha}</b> es el siguiente:\n\n{entradas}\n\n"
+                         "Nota: El texto tachado indica que esa opción del menú ya se acabó."
+                        .format(
+                        fecha=context.user_data[MENU_DATE_CHOICE],
+                        entradas=self._make_entradas(context.user_data[MENU_DATE_CHOICE])
+                    ),
+                    chat_id="@comitectest",
+                    message_id=MENUS_PUBLIC.get(context.user_data[MENU_DATE_CHOICE]),
+                    parse_mode=ParseMode.HTML
+                )
 
             update.callback_query.edit_message_text(
                 text="Menú guardado."
@@ -394,13 +407,15 @@ class BotController:
                         "<i>{tipo}:</i>\n{meals}".format(tipo=MENU_TYPES.get(tipo),
                                                          meals="\n".join([f"₡{p}, {n}." for n, p in meals.items()]))
                         for tipo, meals in menu.items()
+                        if isinstance(meals, dict)
                     ])
                 ),
                 reply_markup=InlineKeyboardMarkup(
                     [
                         [InlineKeyboardButton("Eliminar un menú", callback_data=f"DELETE_MENU,{fecha}")],
                         [InlineKeyboardButton("Editar un menú", callback_data=f"EDIT_MENU,{fecha}")],
-                        [InlineKeyboardButton("Descargar menús", callback_data=f"DOWNLOAD,{fecha}")]
+                        [InlineKeyboardButton("Descargar menús", callback_data=f"DOWNLOAD,{fecha}")],
+                        [InlineKeyboardButton("Publicar", callback_data=f"PUBLICAR,{fecha}")],
                     ]
                 ),
                 parse_mode=ParseMode.HTML
@@ -454,7 +469,7 @@ class BotController:
             text="Plantilla eliminada."
         )
 
-    def _process_deleteing_menu_type(self, update: Update, _: CallbackContext):
+    def _process_deleteing_menu_type(self, update: Update, context: CallbackContext):
         fecha, tipo = update.callback_query.data.split(",")[1:]
 
         if CREATED_MENUS.get(fecha) and CREATED_MENUS.get(fecha).get(tipo):
@@ -466,6 +481,19 @@ class BotController:
             CREATED_MENUS.pop(fecha)
             update.callback_query.delete_message()
             return
+
+        if MENUS_PUBLIC.get(fecha):
+            context.bot.edit_message_text(
+                text="El menú para el <b>{fecha}</b> es el siguiente:\n\n{entradas}\n\n"
+                    "Nota: El texto tachado indica que esa opción del menú ya se acabó."
+                    .format(
+                        fecha=fecha,
+                        entradas=self._make_entradas(fecha)
+                    ),
+                chat_id="@comitectest",
+                message_id=MENUS_PUBLIC.get(fecha),
+                parse_mode=ParseMode.HTML
+            )
 
         update.callback_query.edit_message_text(
             """
@@ -482,7 +510,9 @@ class BotController:
             ),
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("Eliminar un menú", callback_data=f"DELETE_MENU,{fecha}")],
-                [InlineKeyboardButton("Editar un menú", callback_data=f"EDIT_MENU,{fecha}")]
+                [InlineKeyboardButton("Editar un menú", callback_data=f"EDIT_MENU,{fecha}")],
+                [InlineKeyboardButton("Descargar menús", callback_data=f"DOWNLOAD,{fecha}")],
+                [InlineKeyboardButton("Publicar", callback_data=f"PUBLICAR,{fecha}")],
             ]),
             parse_mode=ParseMode.HTML
         )
@@ -641,11 +671,25 @@ class BotController:
             update.callback_query.edit_message_text(
                 "Error, el menú que intenta modificar ya no existe."
             )
+            return
 
         for e in context.user_data["DELETED"]:
             CREATED_MENUS.get(fecha).get(tipo).pop(e)
 
         CREATED_MENUS.get(fecha).get(tipo).update(context.user_data["ADDED"])
+
+        if len(context.user_data["DELETED"]) > 0 or len(context.user_data["ADDED"]) > 0 and MENUS_PUBLIC.get(context.user_data[MENU_DATE_CHOICE]):
+            context.bot.edit_message_text(
+                text="El menú para el <b>{fecha}</b> es el siguiente:\n\n{entradas}\n\n"
+                    "Nota: El texto tachado indica que esa opción del menú ya se acabó."
+                    .format(
+                        fecha=fecha,
+                        entradas=self._make_entradas(fecha)
+                    ),
+                chat_id="@comitectest",
+                message_id=MENUS_PUBLIC.get(context.user_data[MENU_DATE_CHOICE]),
+                parse_mode=ParseMode.HTML
+            )
 
         update.callback_query.edit_message_text(
             """
@@ -662,8 +706,10 @@ class BotController:
             ),
             reply_markup=InlineKeyboardMarkup(
                 [
-                    [InlineKeyboardButton("Eliminar menú", callback_data=f"DELETE_MENU,{fecha}")],
-                    [InlineKeyboardButton("Editar menú", callback_data=f"EDIT_MENU,{fecha}")]
+                    [InlineKeyboardButton("Eliminar un menú", callback_data=f"DELETE_MENU,{fecha}")],
+                    [InlineKeyboardButton("Editar un menú", callback_data=f"EDIT_MENU,{fecha}")],
+                    [InlineKeyboardButton("Descargar menús", callback_data=f"DOWNLOAD,{fecha}")],
+                    [InlineKeyboardButton("Publicar", callback_data=f"PUBLICAR,{fecha}")],
                 ]),
             parse_mode=ParseMode.HTML
         )
@@ -919,6 +965,35 @@ class BotController:
             f"Menu_{fecha.replace('/', '-')}"
         )
 
+    def _publicar(self, update: Update, context: CallbackContext):
+        fecha = update.callback_query.data.split(",")[1]
+
+        MENUS_PUBLIC[fecha] = context.bot.send_message(
+            chat_id="@comitectest",
+            parse_mode=ParseMode.HTML,
+            text=
+            "El menú para el <b>{fecha}</b> es el siguiente:\n\n{entradas}\n\n"
+            "Nota: El texto tachado indica que esa opción del menú ya se acabó."
+            .format(
+                fecha=fecha,
+                entradas=self._make_entradas(fecha)
+            )
+        ).message_id
+
+    def _make_entradas(self, fecha: str):
+        return "\n\n".join([
+            "<i>{tipo}</i>\n{meals}".format(
+                tipo=MENU_TYPES.get(elm),
+                meals="\n".join(
+                    [
+                        f"₡{price}, {meal}"
+                        for meal, price in CREATED_MENUS.get(fecha).get(elm).items()
+                    ] if CREATED_MENUS.get(fecha).get(elm) else
+                    ["Por definir."]
+                )
+            ) for elm in MENU_TYPES.keys()
+        ])
+
 
 
     class SecurityFilter(UpdateFilter):
@@ -939,6 +1014,8 @@ class BotController:
         self.dispatcher.add_handler(MessageHandler(Filters.regex(f"^{LIST_DEFAULTS}$"), self._list_menus_defaults))
 
         self.dispatcher.add_handler(CallbackQueryHandler(self._process_deleteing_menu, pattern=f"^(DELETE_MENU,.*)$"))
+
+        self.dispatcher.add_handler(CallbackQueryHandler(self._publicar, pattern=f"^(PUBLICAR,.*)$"))
 
         self.dispatcher.add_handler(CallbackQueryHandler(self._download, pattern=f"^(DOWNLOAD,.*)$"))
 

@@ -108,29 +108,20 @@ CREATED_MENUS = {
 
 class BotController:
 
-    def __init__(self):
+    def run(self) -> None:
         self.updater = Updater(conf.BOT['TOKEN'])
         self.dispatcher = self.updater.dispatcher
 
-        # self.dispatcher = Dispatcher(Bot(conf.BOT['TOKEN']), None, workers=0)
-        # self._init_handlers()
-        # self.update_queue = Queue()
-        # self.dispatcher = Dispatcher(Bot(token), self.update_queue)
-
-    # def get_queue(self) -> Queue:
-    #
-    #     # Start the thread
-    #     thread = Thread(target=self.dispatcher.start, name='dispatcher')
-    #     thread.start()
-    #
-    #     return self.update_queue
-
-    def run(self) -> None:
         self._init_handlers()
 
         self.updater.start_polling()
 
         self.updater.idle()
+
+    def websocket(self):
+        self.dispatcher = Dispatcher(Bot(conf.BOT['TOKEN']), None, workers=0)
+        self._init_handlers()
+        return self.dispatcher
 
     def _unknown_command(self, update: Update, _: CallbackContext) -> None:
         update.message.reply_text(

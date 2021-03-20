@@ -7,7 +7,7 @@ from telegram import Update
 
 from bot.bot_controller import BotController
 
-dispatcher = BotController().dispatcher
+dispatcher = BotController().websocket()
 
 
 def webhook(request, secret: str):

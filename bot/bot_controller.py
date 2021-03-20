@@ -252,12 +252,12 @@ class BotController:
                 "El precio es demasiado largo. Intente otra vez."
             )
 
-        context.user_data[MENU_MEALS][context.user_data[MENU_TEMP_MEAL]] = update.message.text
+        context.user_data["meals_defaults"][context.user_data[MENU_TEMP_MEAL]] = update.message.text
 
         update.message.reply_text(
             f"La plantilla del menú de <i>{MENU_TYPES.get(context.user_data.get('DEFAULT_TIPO'))}</i> " +
             f"tiene las siguientes opciones:\n\n" +
-            "{}".format("\n".join([f"₡{p}, {n}." for n, p in context.user_data[MENU_MEALS].items()])),
+            "{}".format("\n".join([f"₡{p}, {n}." for n, p in context.user_data["meals_defaults"].items()])),
             reply_markup=InlineKeyboardMarkup(
                 [[InlineKeyboardButton(text="Añadir nueva opción", callback_data=MENU_NEW_MEAL)],
                  [InlineKeyboardButton(text="Guardar plantilla", callback_data=MENU_END_ADDING_MEAL)]]),
@@ -287,7 +287,8 @@ class BotController:
             if MENUS_PUBLIC.get(context.user_data[MENU_DATE_CHOICE]):
                 context.bot.edit_message_text(
                     text="El menú para el <b>{fecha}</b> es el siguiente:\n\n{entradas}\n\n"
-                         "Nota: El texto tachado indica que esa opción del menú ya se acabó."
+                         "Nota: El texto tachado indica que esa opción del menú ya se acabó. "
+                         "Cualquier cambio en el menú se verá reflejado en este mensaje."
                         .format(
                         fecha=context.user_data[MENU_DATE_CHOICE],
                         entradas=self._make_entradas(context.user_data[MENU_DATE_CHOICE])
@@ -304,7 +305,7 @@ class BotController:
 
     def _process_adding_meal_defaults(self, update: Update, context: CallbackContext):
         fecha, tipo = update.callback_query.data.split(",")[1:]
-        context.user_data[MENU_MEALS] = DEFAULT_OPTIONS.get(tipo)
+        context.user_data[MENU_MEALS] = DEFAULT_OPTIONS.get(tipo).copy()
 
         update.callback_query.edit_message_text(
             f"El menú de <i>{MENU_TYPES.get(context.user_data.get(MENU_TYPE_CHOICE))}</i> " +
@@ -334,7 +335,7 @@ class BotController:
             if not DEFAULT_OPTIONS.get(context.user_data["DEFAULT_TIPO"]):
                 DEFAULT_OPTIONS[context.user_data["DEFAULT_TIPO"]] = {}
 
-            DEFAULT_OPTIONS[context.user_data["DEFAULT_TIPO"]] = context.user_data[MENU_MEALS]
+            DEFAULT_OPTIONS[context.user_data["DEFAULT_TIPO"]] = context.user_data["meals_defaults"]
 
             update.callback_query.edit_message_text(
                 text="Plantilla de menú guardada."
@@ -485,7 +486,8 @@ class BotController:
         if MENUS_PUBLIC.get(fecha):
             context.bot.edit_message_text(
                 text="El menú para el <b>{fecha}</b> es el siguiente:\n\n{entradas}\n\n"
-                    "Nota: El texto tachado indica que esa opción del menú ya se acabó."
+                    "Nota: El texto tachado indica que esa opción del menú ya se acabó. "
+                    "Cualquier cambio en el menú se verá reflejado en este mensaje."
                     .format(
                         fecha=fecha,
                         entradas=self._make_entradas(fecha)
@@ -678,16 +680,21 @@ class BotController:
 
         CREATED_MENUS.get(fecha).get(tipo).update(context.user_data["ADDED"])
 
-        if len(context.user_data["DELETED"]) > 0 or len(context.user_data["ADDED"]) > 0 and MENUS_PUBLIC.get(context.user_data[MENU_DATE_CHOICE]):
+
+
+        if (len(context.user_data.get("DELETED")) > 0 or
+            len(context.user_data.get("ADDED")) > 0) and \
+                MENUS_PUBLIC.get(fecha):
             context.bot.edit_message_text(
                 text="El menú para el <b>{fecha}</b> es el siguiente:\n\n{entradas}\n\n"
-                    "Nota: El texto tachado indica que esa opción del menú ya se acabó."
+                    "Nota: El texto tachado indica que esa opción del menú ya se acabó. "
+                    "Cualquier cambio en el menú se verá reflejado en este mensaje."
                     .format(
                         fecha=fecha,
                         entradas=self._make_entradas(fecha)
                     ),
                 chat_id="@comitectest",
-                message_id=MENUS_PUBLIC.get(context.user_data[MENU_DATE_CHOICE]),
+                message_id=MENUS_PUBLIC.get(fecha),
                 parse_mode=ParseMode.HTML
             )
 
@@ -783,7 +790,7 @@ class BotController:
                 """
                 .format(
                 fecha=fecha,
-                tipo=tipo,
+                tipo=MENU_TYPES.get(tipo),
                 entradas="\n".join(
                     [
                         f"₡{price}, {m}." for m, price in CREATED_MENUS.get(fecha).get(tipo).items()
@@ -911,7 +918,7 @@ class BotController:
 
         context.user_data["DEFAULT_TIPO"] = tipo
 
-        context.user_data[MENU_MEALS] = {}
+        context.user_data["meals_defaults"] = {}
 
         update.callback_query.edit_message_text(
             text=f"La plantilla del menú de <i>{MENU_TYPES.get(tipo)}</i> "
@@ -962,7 +969,7 @@ class BotController:
 
         update.effective_chat.send_document(
             open("slides.pdf", "rb"),
-            f"Menu_{fecha.replace('/', '-')}"
+            f"Menu_{fecha.replace('/', '_')}"
         )
 
     def _publicar(self, update: Update, context: CallbackContext):
@@ -973,7 +980,8 @@ class BotController:
             parse_mode=ParseMode.HTML,
             text=
             "El menú para el <b>{fecha}</b> es el siguiente:\n\n{entradas}\n\n"
-            "Nota: El texto tachado indica que esa opción del menú ya se acabó."
+            "Nota: El texto tachado indica que esa opción del menú ya se acabó. "
+            "Cualquier cambio en el menú se verá reflejado en este mensaje."
             .format(
                 fecha=fecha,
                 entradas=self._make_entradas(fecha)
